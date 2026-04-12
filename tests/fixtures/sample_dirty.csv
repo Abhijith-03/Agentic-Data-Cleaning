@@ -1,0 +1,13 @@
+name,email,age,phone,signup_date,salary,status
+John Doe,JOHN.DOE@EXAMPLE.COM,28,555-123-4567,01/15/2024,$52000,active
+Jane Smith,jane.smith@example.com,35,(555) 987-6543,2024-02-20,"$63,500",Active
+Bob Johnson, BOB@EXAMPLE.COM ,42,5551234567,03/10/2024,75000,active
+Alice Brown,alice.brown@example.com,,555.321.7654,04-05-2024,"$48,000",ACTIVE
+Charlie Wilson,charlie@example.com,29,15559876543,2024/05/15,$55000,inactive
+,,55,555-111-2222,06/30/2024,"$120,000",active
+Eve Davis,eve.davis@example.com,31,,07.15.2024,$45000,
+Frank Miller,frank.miller@example.com,999,555-444-3333,08/22/2024,$58000,active
+Grace Lee,grace.lee@example.com,27,555-666-7777,09/01/2024,$52000,active
+ Hank Green ,hank.green@example.com,33,555-888-9999,10/12/2024,salary_unknown,Active
+Ivy Chen,ivy.chen@example.com,28,555-123-4567,01/15/2024,$52000,active
+John Doe,JOHN.DOE@EXAMPLE.COM,28,555-123-4567,01/15/2024,$52000,active

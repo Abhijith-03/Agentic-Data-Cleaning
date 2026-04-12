@@ -1,0 +1,10 @@
+[
+  {"row": 0, "column": "email", "expected_value": "john.doe@example.com"},
+  {"row": 2, "column": "email", "expected_value": "bob@example.com"},
+  {"row": 3, "column": "age", "expected_value": "33"},
+  {"row": 5, "column": "name", "expected_value": "Unknown"},
+  {"row": 5, "column": "email", "expected_value": "Unknown"},
+  {"row": 6, "column": "phone", "expected_value": "Unknown"},
+  {"row": 6, "column": "status", "expected_value": "Unknown"},
+  {"row": 9, "column": "name", "expected_value": "Hank Green"}
+]
