@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agentic Data Cleaning Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/remixicon@4.1.0/fonts/remixicon.css" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-primary:#0a0e1a;--bg-secondary:#111827;--bg-card:#1a1f35;--bg-card-hover:#222842;
+  --border:#2a3050;--border-glow:#3b82f6;
+  --text-primary:#f1f5f9;--text-secondary:#94a3b8;--text-muted:#64748b;
+  --accent:#3b82f6;--accent-hover:#2563eb;--accent-glow:rgba(59,130,246,.25);
+  --success:#10b981;--warning:#f59e0b;--danger:#ef4444;
+  --gradient:linear-gradient(135deg,#3b82f6,#8b5cf6);
+}
+html{font-size:15px}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden}
+a{color:var(--accent);text-decoration:none}
+
+/* Background effect */
+body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;
+  background:radial-gradient(ellipse at 30% 20%,rgba(59,130,246,.06) 0%,transparent 50%),
+             radial-gradient(ellipse at 70% 80%,rgba(139,92,246,.04) 0%,transparent 50%);
+  pointer-events:none;z-index:0}
+
+.app{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:24px 32px 60px}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:20px 0 32px;border-bottom:1px solid var(--border);margin-bottom:32px}
+.logo{display:flex;align-items:center;gap:14px}
+.logo-icon{width:44px;height:44px;background:var(--gradient);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;box-shadow:0 4px 20px var(--accent-glow)}
+.logo h1{font-size:1.5rem;font-weight:700;letter-spacing:-.02em}
+.logo span{font-size:.8rem;color:var(--text-muted);font-weight:400;display:block;margin-top:2px}
+.header-actions{display:flex;gap:10px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:10px;font-size:.875rem;font-weight:500;border:none;cursor:pointer;transition:all .2s}
+.btn-primary{background:var(--gradient);color:#fff;box-shadow:0 2px 12px var(--accent-glow)}
+.btn-primary:hover{box-shadow:0 4px 24px var(--accent-glow);transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--text-secondary);border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--text-primary)}
+.btn-sm{padding:7px 14px;font-size:.8rem;border-radius:8px}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:rgba(239,68,68,.15);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;background:var(--bg-secondary);border-radius:12px;padding:4px;margin-bottom:28px;border:1px solid var(--border)}
+.tab{padding:10px 24px;border-radius:9px;font-size:.875rem;font-weight:500;color:var(--text-muted);cursor:pointer;transition:all .2s}
+.tab:hover{color:var(--text-secondary)}
+.tab.active{background:var(--bg-card);color:var(--text-primary);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+
+/* Cards */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:28px;margin-bottom:20px;transition:all .3s}
+.card:hover{border-color:rgba(59,130,246,.2)}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.card-title{font-size:1.05rem;font-weight:600}
+.card-subtitle{font-size:.8rem;color:var(--text-muted);margin-top:4px}
+
+/* Upload Zone */
+.upload-zone{border:2px dashed var(--border);border-radius:16px;padding:60px 40px;text-align:center;cursor:pointer;transition:all .3s;position:relative;overflow:hidden}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:rgba(59,130,246,.04)}
+.upload-zone.dragover{box-shadow:0 0 40px var(--accent-glow)}
+.upload-zone i{font-size:48px;color:var(--accent);margin-bottom:16px;display:block}
+.upload-zone h3{font-size:1.15rem;font-weight:600;margin-bottom:8px}
+.upload-zone p{color:var(--text-muted);font-size:.875rem}
+.upload-zone .formats{margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.upload-zone .formats span{background:var(--bg-secondary);padding:4px 12px;border-radius:6px;font-size:.75rem;color:var(--text-secondary);border:1px solid var(--border)}
+input[type=file]{display:none}
+
+/* SQL Panel */
+.sql-panel{display:none}
+.sql-panel.active{display:block}
+.form-group{margin-bottom:18px}
+.form-group label{display:block;font-size:.8rem;font-weight:500;color:var(--text-secondary);margin-bottom:6px}
+textarea,input[type=text]{width:100%;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px 16px;color:var(--text-primary);font-family:'Inter',monospace;font-size:.875rem;resize:vertical;transition:border .2s}
+textarea:focus,input[type=text]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+
+/* Progress */
+.progress-container{display:none;margin-top:24px}
+.progress-container.active{display:block}
+.progress-bar-wrap{background:var(--bg-secondary);border-radius:8px;height:6px;overflow:hidden;margin:12px 0}
+.progress-bar{height:100%;background:var(--gradient);border-radius:8px;transition:width .5s;width:0}
+.progress-bar.indeterminate{width:40%;animation:indeterminate 1.4s infinite ease-in-out}
+@keyframes indeterminate{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+.progress-status{display:flex;align-items:center;gap:10px;font-size:.875rem;color:var(--text-secondary)}
+.progress-status i{animation:spin 1s linear infinite;color:var(--accent)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Results Dashboard */
+.results{display:none}
+.results.active{display:block}
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.metric-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:14px;padding:22px;text-align:center;transition:all .3s}
+.metric-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.metric-value{font-size:2rem;font-weight:800;letter-spacing:-.03em;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.metric-value.success{background:linear-gradient(135deg,#10b981,#34d399);-webkit-background-clip:text;background-clip:text}
+.metric-value.warn{background:linear-gradient(135deg,#f59e0b,#fbbf24);-webkit-background-clip:text;background-clip:text}
+.metric-label{font-size:.78rem;color:var(--text-muted);margin-top:6px;font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+
+/* Confidence Gauge */
+.gauge-container{display:flex;align-items:center;justify-content:center;gap:24px;padding:20px 0}
+.gauge{position:relative;width:140px;height:140px}
+.gauge svg{transform:rotate(-90deg)}
+.gauge circle{fill:none;stroke-width:10;stroke-linecap:round}
+.gauge .bg{stroke:var(--border)}
+.gauge .fill{stroke:url(#gaugeGrad);transition:stroke-dashoffset .8s ease}
+.gauge .value{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column}
+.gauge .value strong{font-size:1.8rem;font-weight:800}
+.gauge .value span{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+
+/* Fix breakdown */
+.breakdown{display:flex;gap:12px;flex-wrap:wrap}
+.breakdown-chip{display:flex;align-items:center;gap:8px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:10px 16px}
+.breakdown-chip .count{font-weight:700;font-size:1.1rem}
+.breakdown-chip .type{font-size:.78rem;color:var(--text-secondary);text-transform:capitalize}
+
+/* Audit Table */
+.audit-table-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+th{background:var(--bg-secondary);padding:12px 16px;text-align:left;font-weight:600;color:var(--text-secondary);text-transform:uppercase;font-size:.7rem;letter-spacing:.05em;position:sticky;top:0}
+td{padding:11px 16px;border-top:1px solid var(--border);vertical-align:top;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:hover td{background:rgba(59,130,246,.03)}
+.badge{display:inline-flex;padding:3px 10px;border-radius:6px;font-size:.72rem;font-weight:600}
+.badge-rule{background:rgba(16,185,129,.12);color:var(--success)}
+.badge-pattern{background:rgba(245,158,11,.12);color:var(--warning)}
+.badge-llm{background:rgba(139,92,246,.12);color:#a78bfa}
+.confidence-bar{display:inline-block;width:60px;height:6px;background:var(--bg-primary);border-radius:3px;overflow:hidden;vertical-align:middle;margin-right:6px}
+.confidence-bar span{display:block;height:100%;border-radius:3px}
+
+/* Actions bar */
+.actions-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+
+/* History panel */
+.history-list{display:flex;flex-direction:column;gap:10px}
+.history-item{display:flex;align-items:center;justify-content:space-between;background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:16px 20px;cursor:pointer;transition:all .2s}
+.history-item:hover{border-color:var(--accent);background:var(--bg-card-hover)}
+.history-item .info{display:flex;flex-direction:column;gap:3px}
+.history-item .name{font-weight:600;font-size:.9rem}
+.history-item .meta{font-size:.75rem;color:var(--text-muted)}
+.status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.status-dot.completed{background:var(--success)}
+.status-dot.running{background:var(--accent);animation:pulse 1.5s infinite}
+.status-dot.failed{background:var(--danger)}
+.status-dot.pending{background:var(--text-muted)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* Section toggle */
+.section{display:none}.section.active{display:block}
+
+/* Responsive */
+@media(max-width:768px){
+  .app{padding:16px}
+  .metrics-grid{grid-template-columns:repeat(2,1fr)}
+  .header{flex-direction:column;gap:16px;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<svg style="position:absolute;width:0;height:0">
+  <defs><linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#8b5cf6"/>
+  </linearGradient></defs>
+</svg>
+
+<div class="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon"><i class="ri-sparkle-fill"></i></div>
+      <div>
+        <h1>Agentic Data Cleaner</h1>
+        <span>Multi-agent AI pipeline &bull; LangGraph + GPT-4o</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-ghost btn-sm" onclick="showSection('history')"><i class="ri-history-line"></i> History</button>
+      <button class="btn btn-ghost btn-sm" onclick="showSection('patterns')"><i class="ri-brain-line"></i> Learned Patterns</button>
+    </div>
+  </header>
+
+  <!-- Main upload section -->
+  <div id="sec-upload" class="section active">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('file',this)">File Upload</div>
+      <div class="tab" onclick="switchTab('sql',this)">SQL Query</div>
+    </div>
+
+    <!-- File Upload -->
+    <div id="panel-file">
+      <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <i class="ri-upload-cloud-2-line"></i>
+        <h3>Drop your dataset here</h3>
+        <p>or click to browse files</p>
+        <div class="formats">
+          <span>.CSV</span><span>.XLSX</span><span>.XLS</span><span>.TSV</span><span>.PARQUET</span>
+        </div>
+      </div>
+      <input type="file" id="fileInput" accept=".csv,.tsv,.xlsx,.xls,.parquet">
+    </div>
+
+    <!-- SQL Panel -->
+    <div id="panel-sql" class="sql-panel">
+      <div class="card">
+        <div class="form-group">
+          <label>Connection String</label>
+          <input type="text" id="connStr" placeholder="postgresql://user:pass@host:5432/dbname">
+        </div>
+        <div class="form-group">
+          <label>SQL Query</label>
+          <textarea id="sqlQuery" rows="4" placeholder="SELECT * FROM customers WHERE created_at > '2024-01-01'"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="submitSQL()"><i class="ri-play-fill"></i> Run & Clean</button>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-container" id="progressContainer">
+      <div class="card">
+        <div class="progress-status">
+          <i class="ri-loader-4-line"></i>
+          <span id="progressText">Starting pipeline...</span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar indeterminate" id="progressBar"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results Section -->
+  <div id="sec-results" class="section">
+    <button class="btn btn-ghost btn-sm" onclick="showSection('upload')" style="margin-bottom:20px">
+      <i class="ri-arrow-left-line"></i> New Cleaning Job
+    </button>
+
+    <div class="actions-bar" id="actionsBar">
+      <button class="btn btn-primary btn-sm" onclick="downloadCleaned()"><i class="ri-download-2-line"></i> Download Cleaned Data</button>
+      <button class="btn btn-ghost btn-sm" onclick="downloadAudit()"><i class="ri-file-list-3-line"></i> Download Audit Log</button>
+    </div>
+
+    <!-- Metrics -->
+    <div class="metrics-grid" id="metricsGrid"></div>
+
+    <!-- Confidence Gauge + Breakdown -->
+    <div class="card">
+      <div class="card-header">
+        <div><div class="card-title">Cleaning Summary</div><div class="card-subtitle">Confidence & fix breakdown</div></div>
+      </div>
+      <div class="gauge-container">
+        <div class="gauge">
+          <svg viewBox="0 0 160 160" width="140" height="140">
+            <circle class="bg" cx="80" cy="80" r="65"/>
+            <circle class="fill" id="gaugeCircle" cx="80" cy="80" r="65"
+              stroke-dasharray="408.4" stroke-dashoffset="408.4"/>
+          </svg>
+          <div class="value"><strong id="gaugeValue">0%</strong><span>Confidence</span></div>
+        </div>
+        <div>
+          <div style="font-weight:600;margin-bottom:12px">Fix Breakdown</div>
+          <div class="breakdown" id="breakdownChips"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audit Log Table -->
+    <div class="card">
+      <div class="card-header">
+        <div><div class="card-title">Audit Log</div><div class="card-subtitle">Every change with reasoning and confidence</div></div>
+        <span id="auditCount" style="font-size:.8rem;color:var(--text-muted)"></span>
+      </div>
+      <div class="audit-table-wrap" style="max-height:500px;overflow-y:auto">
+        <table>
+          <thead><tr>
+            <th>Row</th><th>Column</th><th>Original</th><th>New Value</th>
+            <th>Method</th><th>Confidence</th><th>Reasoning</th>
+          </tr></thead>
+          <tbody id="auditBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Section -->
+  <div id="sec-history" class="section">
+    <button class="btn btn-ghost btn-sm" onclick="showSection('upload')" style="margin-bottom:20px">
+      <i class="ri-arrow-left-line"></i> Back
+    </button>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Job History</div></div>
+      <div class="history-list" id="historyList"><p style="color:var(--text-muted);text-align:center;padding:40px">No jobs yet</p></div>
+    </div>
+  </div>
+
+  <!-- Patterns Section -->
+  <div id="sec-patterns" class="section">
+    <button class="btn btn-ghost btn-sm" onclick="showSection('upload')" style="margin-bottom:20px">
+      <i class="ri-arrow-left-line"></i> Back
+    </button>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Learned Patterns</div><div class="card-subtitle">Auto-learned from previous LLM fixes</div></div>
+      <div class="audit-table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Column Pattern</th><th>Value Pattern</th><th>Fix Template</th><th>Domain</th><th>Success</th><th>Confidence</th></tr></thead>
+          <tbody id="patternsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentJobId = null;
+let pollInterval = null;
+
+// ── Tab switching ──
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-file').style.display = tab === 'file' ? 'block' : 'none';
+  document.getElementById('panel-sql').style.display = tab === 'sql' ? 'block' : 'none';
+  document.getElementById('panel-sql').classList.toggle('active', tab === 'sql');
+}
+
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('sec-' + name).classList.add('active');
+  if (name === 'history') loadHistory();
+  if (name === 'patterns') loadPatterns();
+}
+
+// ── Drag & drop ──
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+['dragenter','dragover'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.add('dragover'); }));
+['dragleave','drop'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.remove('dragover'); }));
+dropZone.addEventListener('drop', ev => { if(ev.dataTransfer.files.length) uploadFile(ev.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if(fileInput.files.length) uploadFile(fileInput.files[0]); });
+
+// ── Upload ──
+async function uploadFile(file) {
+  const form = new FormData();
+  form.append('file', file);
+
+  showProgress('Uploading ' + file.name + '...');
+
+  try {
+    const res = await fetch('/api/clean/upload', { method: 'POST', body: form });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Upload failed'); }
+    const data = await res.json();
+    currentJobId = data.job_id;
+    showProgress('Pipeline started...');
+    startPolling();
+  } catch(e) {
+    hideProgress();
+    alert('Error: ' + e.message);
+  }
+}
+
+async function submitSQL() {
+  const conn = document.getElementById('connStr').value.trim();
+  const query = document.getElementById('sqlQuery').value.trim();
+  if (!conn || !query) { alert('Please fill in both fields'); return; }
+
+  showProgress('Submitting SQL query...');
+  try {
+    const res = await fetch('/api/clean/sql', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ sql_query: query, connection_string: conn })
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
+    const data = await res.json();
+    currentJobId = data.job_id;
+    startPolling();
+  } catch(e) {
+    hideProgress();
+    alert('Error: ' + e.message);
+  }
+}
+
+// ── Polling ──
+function startPolling() {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(pollJob, 1000);
+}
+
+async function pollJob() {
+  if (!currentJobId) return;
+  try {
+    const res = await fetch('/api/jobs/' + currentJobId);
+    const job = await res.json();
+
+    if (job.status === 'running') {
+      updateProgress(job.progress || 'Processing...');
+    } else if (job.status === 'completed') {
+      clearInterval(pollInterval);
+      hideProgress();
+      renderResults(job.result);
+      showSection('results');
+    } else if (job.status === 'failed') {
+      clearInterval(pollInterval);
+      hideProgress();
+      alert('Pipeline failed: ' + (job.error || 'Unknown error'));
+    }
+  } catch(e) { console.error(e); }
+}
+
+function showProgress(text) {
+  const c = document.getElementById('progressContainer');
+  c.classList.add('active');
+  document.getElementById('progressText').textContent = text;
+}
+function updateProgress(text) { document.getElementById('progressText').textContent = text; }
+function hideProgress() { document.getElementById('progressContainer').classList.remove('active'); }
+
+// ── Render results ──
+function renderResults(r) {
+  const grid = document.getElementById('metricsGrid');
+  const vp = r.validation_passed;
+  grid.innerHTML = `
+    <div class="metric-card"><div class="metric-value">${r.total_rows.toLocaleString()}</div><div class="metric-label">Total Rows</div></div>
+    <div class="metric-card"><div class="metric-value">${r.issues_detected}</div><div class="metric-label">Issues Detected</div></div>
+    <div class="metric-card"><div class="metric-value success">${r.fixes_applied}</div><div class="metric-label">Fixes Applied</div></div>
+    <div class="metric-card"><div class="metric-value${vp ? ' success' : ' warn'}">${vp ? 'PASS' : 'FAIL'}</div><div class="metric-label">Validation</div></div>
+    <div class="metric-card"><div class="metric-value">${r.duration_seconds.toFixed(1)}s</div><div class="metric-label">Duration</div></div>
+    <div class="metric-card"><div class="metric-value">${r.iterations || 1}</div><div class="metric-label">Iterations</div></div>
+  `;
+
+  // Gauge
+  const pct = Math.round(r.overall_confidence * 100);
+  const circ = 408.4;
+  document.getElementById('gaugeCircle').style.strokeDashoffset = circ - (circ * pct / 100);
+  document.getElementById('gaugeValue').textContent = pct + '%';
+
+  // Breakdown
+  const chips = document.getElementById('breakdownChips');
+  chips.innerHTML = Object.entries(r.fix_breakdown || {}).map(([k,v]) =>
+    `<div class="breakdown-chip"><span class="count">${v}</span><span class="type">${k.replace(/_/g,' ')}</span></div>`
+  ).join('');
+
+  // Audit table
+  const actions = r.cleaning_actions || r.audit_log || [];
+  document.getElementById('auditCount').textContent = actions.length + ' entries';
+  const tbody = document.getElementById('auditBody');
+  tbody.innerHTML = actions.map(a => {
+    const method = a.rule || a.fix_method || '';
+    let badge = 'rule';
+    if (method.startsWith('pattern:')) badge = 'pattern';
+    else if (method.startsWith('llm:')) badge = 'llm';
+
+    const conf = a.confidence || 0;
+    const barColor = conf >= .9 ? 'var(--success)' : conf >= .7 ? 'var(--warning)' : 'var(--danger)';
+
+    return `<tr>
+      <td>${a.row ?? a.row_index ?? '-'}</td>
+      <td><strong>${a.column || a.column_name || ''}</strong></td>
+      <td title="${esc(a.old_value ?? a.original_value ?? '')}">${esc(trunc(a.old_value ?? a.original_value ?? '', 30))}</td>
+      <td title="${esc(a.new_value ?? '')}">${esc(trunc(a.new_value ?? '', 30))}</td>
+      <td><span class="badge badge-${badge}">${method}</span></td>
+      <td><div class="confidence-bar"><span style="width:${conf*100}%;background:${barColor}"></span></div>${(conf*100).toFixed(0)}%</td>
+      <td title="${esc(a.reasoning || '')}">${esc(trunc(a.reasoning || '', 60))}</td>
+    </tr>`;
+  }).join('');
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+function trunc(s, n) { s = String(s); return s.length > n ? s.slice(0, n) + '...' : s; }
+
+// ── Downloads ──
+function downloadCleaned() { if(currentJobId) window.open('/api/download/' + currentJobId, '_blank'); }
+function downloadAudit() { if(currentJobId) window.open('/api/download/' + currentJobId + '/audit', '_blank'); }
+
+// ── History ──
+async function loadHistory() {
+  try {
+    const res = await fetch('/api/jobs');
+    const jobs = await res.json();
+    const list = document.getElementById('historyList');
+    if (!jobs.length) { list.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px">No jobs yet</p>'; return; }
+    list.innerHTML = jobs.map(j => `
+      <div class="history-item" onclick="viewJob('${j.job_id}')">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div class="status-dot ${j.status}"></div>
+          <div class="info">
+            <div class="name">${j.filename || j.dataset_id || j.job_id}</div>
+            <div class="meta">${j.dataset_id} &bull; ${new Date(j.created_at * 1000).toLocaleString()}</div>
+          </div>
+        </div>
+        <span class="badge badge-${j.status === 'completed' ? 'rule' : j.status === 'failed' ? '' : 'pattern'}" 
+              style="${j.status === 'failed' ? 'background:rgba(239,68,68,.12);color:var(--danger)' : ''}">${j.status}</span>
+      </div>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function viewJob(jobId) {
+  currentJobId = jobId;
+  const res = await fetch('/api/jobs/' + jobId);
+  const job = await res.json();
+  if (job.status === 'completed' && job.result) {
+    renderResults(job.result);
+    showSection('results');
+  } else if (job.status === 'running') {
+    showSection('upload');
+    showProgress(job.progress || 'Running...');
+    startPolling();
+  }
+}
+
+// ── Patterns ──
+async function loadPatterns() {
+  try {
+    const res = await fetch('/api/patterns');
+    const patterns = await res.json();
+    const tbody = document.getElementById('patternsBody');
+    if (!patterns.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:40px">No patterns learned yet. Run the pipeline to auto-learn from LLM fixes.</td></tr>'; return; }
+    tbody.innerHTML = patterns.map(p => `<tr>
+      <td>${p.id || '-'}</td>
+      <td><code>${esc(p.column_pattern)}</code></td>
+      <td><code>${esc(trunc(p.value_pattern, 40))}</code></td>
+      <td><code>${esc(trunc(p.fix_template, 40))}</code></td>
+      <td>${p.domain}</td>
+      <td>${p.success_count}/${p.success_count + p.fail_count}</td>
+      <td>${p.confidence !== undefined ? (p.confidence * 100).toFixed(0) + '%' : '-'}</td>
+    </tr>`).join('');
+  } catch(e) { console.error(e); }
+}
+</script>
+</body>
+</html>

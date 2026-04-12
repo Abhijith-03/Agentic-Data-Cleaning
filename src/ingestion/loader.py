@@ -26,7 +26,14 @@ def load_file(path: str | Path, **kwargs: Any) -> pd.DataFrame:
 
     if ext in {".csv", ".tsv"}:
         sep = kwargs.pop("sep", "\t" if ext == ".tsv" else ",")
-        return pd.read_csv(path, sep=sep, dtype=str, keep_default_na=False, **kwargs)
+        encoding = kwargs.pop("encoding", None)
+        if encoding is None:
+            try:
+                return pd.read_csv(path, sep=sep, dtype=str, keep_default_na=False, encoding="utf-8", **kwargs)
+            except UnicodeDecodeError:
+                logger.warning("UTF-8 decode failed for %s, falling back to latin-1", path.name)
+                return pd.read_csv(path, sep=sep, dtype=str, keep_default_na=False, encoding="latin-1", **kwargs)
+        return pd.read_csv(path, sep=sep, dtype=str, keep_default_na=False, encoding=encoding, **kwargs)
     elif ext in {".xlsx", ".xls"}:
         sheet = kwargs.pop("sheet_name", 0)
         return pd.read_excel(path, sheet_name=sheet, dtype=str, keep_default_na=False, **kwargs)

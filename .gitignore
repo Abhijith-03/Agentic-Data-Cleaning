@@ -13,3 +13,4 @@ data/
 .pytest_cache/
 .coverage
 htmlcov/
+debug-*.log
