@@ -23,7 +23,6 @@ from src.knowledge.pattern_store import PatternStore
 from src.knowledge.rules_engine import (
     CleaningAction,
     apply_format_rules,
-    find_fuzzy_duplicate,
     impute_categorical_mode,
     impute_numeric_median,
     impute_unknown,
@@ -171,11 +170,15 @@ def _llm_repair(
 @traceable(name="cleaner", metadata={"agent": "cleaner"})
 def cleaner_node(state: DataCleaningState) -> dict[str, Any]:
     """LangGraph node: repair all detected issues."""
-    records = state.get("raw_records", [])
+    iteration = state.get("iteration_count", 0)
+    # On first pass use raw_records; on re-iterations use the previously cleaned data
+    if iteration > 0 and state.get("cleaned_records"):
+        records = state.get("cleaned_records", [])
+    else:
+        records = state.get("raw_records", [])
     anomalies = state.get("anomalies", [])
     inferred_schema = state.get("inferred_schema", {})
     existing_actions = state.get("cleaning_actions", [])
-    iteration = state.get("iteration_count", 0)
 
     # Also fix validation errors from previous iteration
     validation_errors = state.get("validation_errors", [])

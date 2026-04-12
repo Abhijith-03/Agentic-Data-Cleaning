@@ -6,10 +6,9 @@ import logging
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from src.main import run_pipeline
@@ -26,10 +25,10 @@ app = FastAPI(
 class CleaningRequest(BaseModel):
     """Request body for cleaning via file path or SQL."""
     source_path: str = Field(description="Path to the input file")
-    dataset_id: str | None = None
+    dataset_id: Optional[str] = None
     output_format: str = "csv"
-    sql_query: str | None = None
-    connection_string: str | None = None
+    sql_query: Optional[str] = None
+    connection_string: Optional[str] = None
 
 
 class CleaningResponse(BaseModel):
@@ -40,8 +39,8 @@ class CleaningResponse(BaseModel):
     overall_confidence: float
     validation_passed: bool
     duration_seconds: float
-    output_path: str | None = None
-    fix_breakdown: dict[str, int] = Field(default_factory=dict)
+    output_path: Optional[str] = None
+    fix_breakdown: dict[str, int] = Field(default_factory=dict)  # type: ignore[assignment]
 
 
 @app.get("/health")
@@ -131,7 +130,7 @@ async def clean_uploaded_file(file: UploadFile = File(...)) -> CleaningResponse:
 
 
 @app.get("/patterns")
-async def list_patterns(domain: str | None = None) -> list[dict[str, Any]]:
+async def list_patterns(domain: Optional[str] = None) -> list[dict[str, Any]]:
     """List learned patterns from the pattern store."""
     from src.knowledge.pattern_store import PatternStore
 

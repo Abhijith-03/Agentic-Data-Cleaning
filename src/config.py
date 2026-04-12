@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
@@ -39,7 +41,7 @@ class Settings(BaseSettings):
 
     # --- Database ---
     database_url: str = Field(default="sqlite:///./data/agentic_clean.db", alias="DATABASE_URL")
-    redis_url: str | None = Field(default=None, alias="REDIS_URL")
+    redis_url: Optional[str] = Field(default=None, alias="REDIS_URL")
 
     # --- Human-in-the-loop ---
     human_in_loop_enabled: bool = False
