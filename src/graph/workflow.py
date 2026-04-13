@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import time
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 from langgraph.graph import END, StateGraph
@@ -12,13 +14,157 @@ from src.agents.anomaly_detector import anomaly_detector_node
 from src.agents.cleaner import cleaner_node
 from src.agents.confidence_scorer import confidence_scorer_node
 from src.agents.data_profiler import data_profiler_node
+from src.agents.reconstruction_schema_planner import reconstruction_schema_planner_node
 from src.agents.schema_analyzer import schema_analyzer_node
+from src.agents.structure_reconstruction import structure_reconstruction_node
 from src.agents.validator import validator_node
 from src.config import settings
 from src.graph.state import DataCleaningState
 from src.ingestion.loader import dataframe_to_records, load
 
 logger = logging.getLogger(__name__)
+
+PipelineNode = Callable[[DataCleaningState], dict[str, Any]]
+
+
+def _merge_state(
+    state: DataCleaningState,
+    updates: dict[str, Any],
+) -> dict[str, Any]:
+    merged = dict(state)
+    merged.update(updates)
+    return merged
+
+
+def _average_confidence(items: list[dict[str, Any]], field: str = "confidence") -> float | None:
+    values = [float(item.get(field, 0.0)) for item in items if item.get(field) is not None]
+    if not values:
+        return None
+    return round(sum(values) / len(values), 4)
+
+
+def _records_for_stage_preview(stage_name: str, state: dict[str, Any]) -> list[dict[str, Any]]:
+    if stage_name in {"cleaning", "validation", "confidence_scoring", "human_review", "output"}:
+        cleaned = state.get("cleaned_records") or []
+        if cleaned:
+            return cleaned
+    return state.get("raw_records") or []
+
+
+def _build_stage_preview(stage_name: str, state: dict[str, Any]) -> dict[str, Any]:
+    records = _records_for_stage_preview(stage_name, state)
+    preview_rows = records[:50]
+    column_names = list(preview_rows[0].keys()) if preview_rows else []
+    return {
+        "row_count": len(records),
+        "column_names": column_names,
+        "rows": preview_rows,
+        "truncated": len(records) > len(preview_rows),
+    }
+
+
+def _build_stage_summary(stage_name: str, state: dict[str, Any]) -> dict[str, Any]:
+    if stage_name == "ingest":
+        records = state.get("raw_records") or []
+        return {
+            "rows": len(records),
+            "columns": len(records[0]) if records else 0,
+        }
+    if stage_name == "reconstruction_schema_planner":
+        spec = state.get("reconstruction_spec") or {}
+        return {
+            "schema_found": bool(spec),
+            "target_columns": spec.get("target_columns", []),
+            "delimiter": spec.get("delimiter"),
+            "expected_field_count": spec.get("expected_field_count"),
+        }
+    if stage_name == "structure_reconstruction":
+        return state.get("reconstruction_report", {})
+    if stage_name == "schema_analysis":
+        return {
+            "columns_inferred": len(state.get("inferred_schema", {})),
+            "issue_count": len(state.get("schema_issues", [])),
+        }
+    if stage_name == "data_profiling":
+        return {
+            "profile_columns": len(state.get("profile_report", {})),
+            "data_quality_score": state.get("data_quality_score", 0.0),
+        }
+    if stage_name == "anomaly_detection":
+        return {"anomaly_count": len(state.get("anomalies", []))}
+    if stage_name == "cleaning":
+        return {
+            "iteration_count": state.get("iteration_count", 0),
+            "fix_count": len(state.get("cleaning_actions", [])),
+        }
+    if stage_name == "validation":
+        return {
+            "validation_passed": state.get("validation_passed", False),
+            "error_count": len(state.get("validation_errors", [])),
+        }
+    if stage_name == "confidence_scoring":
+        report = state.get("final_report", {})
+        return {
+            "overall_confidence": report.get("overall_confidence", 0.0),
+            "issues_fixed": report.get("issues_fixed", 0),
+            "issues_skipped": report.get("issues_skipped", 0),
+            "low_confidence_count": len(state.get("low_confidence_fixes", [])),
+        }
+    if stage_name == "human_review":
+        return {
+            "remaining_low_confidence": len(state.get("low_confidence_fixes", [])),
+        }
+    if stage_name == "output":
+        report = state.get("final_report", {})
+        return {
+            "overall_confidence": report.get("overall_confidence", 0.0),
+            "validation_passed": report.get("validation_passed", False),
+        }
+    return {}
+
+
+def _stage_confidence(stage_name: str, state: dict[str, Any]) -> float | None:
+    if stage_name == "structure_reconstruction":
+        confs = state.get("reconstruction_row_confidences", [])
+        return round(sum(confs) / len(confs), 4) if confs else None
+    if stage_name == "cleaning":
+        return _average_confidence(state.get("cleaning_actions", []))
+    if stage_name in {"validation", "confidence_scoring", "output"}:
+        report = state.get("final_report", {})
+        if "overall_confidence" in report:
+            return report.get("overall_confidence")
+    return None
+
+
+def _instrument_node(stage_name: str, node: PipelineNode) -> PipelineNode:
+    def wrapped(state: DataCleaningState) -> dict[str, Any]:
+        started_at = time.time()
+        started_perf = time.perf_counter()
+        updates = node(state)
+        completed_at = time.time()
+        duration_ms = round((time.perf_counter() - started_perf) * 1000, 2)
+
+        merged = _merge_state(state, updates)
+
+        stages = dict(state.get("pipeline_stages", {}))
+        stages[stage_name] = {
+            "name": stage_name,
+            "status": "success",
+            "started_at": started_at,
+            "completed_at": completed_at,
+            "duration_ms": duration_ms,
+            "confidence_score": _stage_confidence(stage_name, merged),
+            "summary": _build_stage_summary(stage_name, merged),
+        }
+
+        previews = dict(state.get("stage_previews", {}))
+        previews[stage_name] = _build_stage_preview(stage_name, merged)
+
+        updates["pipeline_stages"] = stages
+        updates["stage_previews"] = previews
+        return updates
+
+    return wrapped
 
 
 # ---------------------------------------------------------------------------
@@ -119,20 +265,35 @@ def build_graph() -> StateGraph:
     """Build and compile the data cleaning LangGraph workflow."""
     graph = StateGraph(DataCleaningState)
 
+    nodes: dict[str, PipelineNode] = {
+        "ingest": _instrument_node("ingest", ingest_node),
+        "reconstruction_schema_planner": _instrument_node(
+            "reconstruction_schema_planner",
+            reconstruction_schema_planner_node,
+        ),
+        "structure_reconstruction": _instrument_node(
+            "structure_reconstruction",
+            structure_reconstruction_node,
+        ),
+        "schema_analysis": _instrument_node("schema_analysis", schema_analyzer_node),
+        "data_profiling": _instrument_node("data_profiling", data_profiler_node),
+        "anomaly_detection": _instrument_node("anomaly_detection", anomaly_detector_node),
+        "cleaning": _instrument_node("cleaning", cleaner_node),
+        "validation": _instrument_node("validation", validator_node),
+        "confidence_scoring": _instrument_node("confidence_scoring", confidence_scorer_node),
+        "human_review": _instrument_node("human_review", human_review_node),
+        "output": _instrument_node("output", output_node),
+    }
+
     # Add nodes
-    graph.add_node("ingest", ingest_node)
-    graph.add_node("schema_analysis", schema_analyzer_node)
-    graph.add_node("data_profiling", data_profiler_node)
-    graph.add_node("anomaly_detection", anomaly_detector_node)
-    graph.add_node("cleaning", cleaner_node)
-    graph.add_node("validation", validator_node)
-    graph.add_node("confidence_scoring", confidence_scorer_node)
-    graph.add_node("human_review", human_review_node)
-    graph.add_node("output", output_node)
+    for name, node in nodes.items():
+        graph.add_node(name, node)
 
     # Linear edges
     graph.set_entry_point("ingest")
-    graph.add_edge("ingest", "schema_analysis")
+    graph.add_edge("ingest", "reconstruction_schema_planner")
+    graph.add_edge("reconstruction_schema_planner", "structure_reconstruction")
+    graph.add_edge("structure_reconstruction", "schema_analysis")
     graph.add_edge("schema_analysis", "data_profiling")
     graph.add_edge("data_profiling", "anomaly_detection")
     graph.add_edge("anomaly_detection", "cleaning")

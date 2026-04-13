@@ -27,6 +27,52 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _build_preview(records: list[dict[str, Any]], limit: int = 100) -> dict[str, Any]:
+    preview_rows = records[:limit]
+    return {
+        "rows": preview_rows,
+        "row_count": len(records),
+        "column_names": list(preview_rows[0].keys()) if preview_rows else [],
+        "truncated": len(records) > len(preview_rows),
+    }
+
+
+def _aggregate_pipeline_stages(
+    stage_runs: dict[str, list[dict[str, Any]]],
+) -> dict[str, dict[str, Any]]:
+    aggregated: dict[str, dict[str, Any]] = {}
+    for stage_name, runs in stage_runs.items():
+        durations = [float(run.get("duration_ms", 0.0)) for run in runs]
+        confidences = [run.get("confidence_score") for run in runs if run.get("confidence_score") is not None]
+        aggregated[stage_name] = {
+            "name": stage_name,
+            "status": "success" if all(run.get("status") == "success" for run in runs) else "partial",
+            "duration_ms": round(sum(durations), 2),
+            "chunk_runs": len(runs),
+            "confidence_score": round(sum(confidences) / len(confidences), 4) if confidences else None,
+            "summary": runs[-1].get("summary", {}) if runs else {},
+        }
+    return aggregated
+
+
+def _build_mock_review_queue(low_confidence_fixes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    queue: list[dict[str, Any]] = []
+    for index, fix in enumerate(low_confidence_fixes):
+        queue.append({
+            "id": f"review-{index}",
+            "status": "pending",
+            "row": fix.get("row", -1),
+            "column": fix.get("column", ""),
+            "old_value": fix.get("old_value"),
+            "suggested_value": fix.get("new_value"),
+            "confidence": fix.get("confidence", 0.0),
+            "reasoning": fix.get("reasoning", ""),
+            "issue_type": fix.get("issue_type", "unknown"),
+            "fix_method": fix.get("rule", "unknown"),
+        })
+    return queue
+
+
 def run_pipeline(
     source: str,
     *,
@@ -56,7 +102,17 @@ def run_pipeline(
     all_cleaned: list[dict[str, Any]] = []
     all_actions: list[dict[str, Any]] = []
     all_audit: list[dict[str, Any]] = []
+    all_anomalies: list[dict[str, Any]] = []
+    all_low_confidence: list[dict[str, Any]] = []
+    all_llm_logs: list[dict[str, Any]] = []
     final_report: dict[str, Any] = {}
+    pipeline_stage_runs: dict[str, list[dict[str, Any]]] = {}
+    stage_previews: dict[str, dict[str, Any]] = {}
+    chunk_results: list[dict[str, Any]] = []
+    latest_schema: dict[str, Any] = {}
+    latest_schema_issues: list[dict[str, Any]] = []
+    latest_profile_report: dict[str, Any] = {}
+    latest_reconstruction_report: dict[str, Any] = {}
 
     for i, chunk in enumerate(chunks):
         logger.info("Processing chunk %d/%d (%d records)", i + 1, len(chunks), len(chunk))
@@ -76,7 +132,31 @@ def run_pipeline(
         all_cleaned.extend(result.get("cleaned_records", chunk))
         all_actions.extend(result.get("cleaning_actions", []))
         all_audit.extend(result.get("audit_log", []))
+        all_anomalies.extend(result.get("anomalies", []))
+        all_low_confidence.extend(result.get("low_confidence_fixes", []))
+        all_llm_logs.extend(result.get("llm_logs", []))
         final_report = result.get("final_report", {})
+        latest_schema = result.get("inferred_schema", latest_schema)
+        latest_schema_issues = result.get("schema_issues", latest_schema_issues)
+        latest_profile_report = result.get("profile_report", latest_profile_report)
+        latest_reconstruction_report = result.get("reconstruction_report", latest_reconstruction_report)
+        for stage_name, stage_info in (result.get("pipeline_stages", {}) or {}).items():
+            pipeline_stage_runs.setdefault(stage_name, []).append(stage_info)
+
+        for stage_name, preview in (result.get("stage_previews", {}) or {}).items():
+            stage_previews.setdefault(stage_name, preview)
+
+        chunk_results.append({
+            "chunk_index": i,
+            "row_count": len(chunk),
+            "pipeline_stages": result.get("pipeline_stages", {}),
+            "stage_previews": result.get("stage_previews", {}),
+            "anomalies": result.get("anomalies", []),
+            "cleaning_actions": result.get("cleaning_actions", []),
+            "audit_log": result.get("audit_log", []),
+            "llm_logs": result.get("llm_logs", []),
+            "review_queue": result.get("review_queue", []),
+        })
 
     # Aggregate report
     elapsed = time.time() - start
@@ -116,6 +196,19 @@ def run_pipeline(
         "cleaned_records": all_cleaned,
         "cleaning_actions": all_actions,
         "audit_log": all_audit,
+        "anomalies": all_anomalies,
+        "low_confidence_fixes": all_low_confidence,
+        "llm_logs": all_llm_logs,
+        "review_queue": _build_mock_review_queue(all_low_confidence),
+        "inferred_schema": latest_schema,
+        "schema_issues": latest_schema_issues,
+        "profile_report": latest_profile_report,
+        "reconstruction_report": latest_reconstruction_report,
+        "pipeline_stages": _aggregate_pipeline_stages(pipeline_stage_runs),
+        "stage_previews": stage_previews,
+        "raw_preview": _build_preview(all_records),
+        "cleaned_preview": _build_preview(all_cleaned),
+        "chunk_results": chunk_results,
         "report": final_report,
     }
 

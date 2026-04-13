@@ -59,6 +59,36 @@ def _get_llm() -> ChatOpenAI:
     )
 
 
+def _build_llm_context(
+    issue: dict[str, Any],
+    records: list[dict[str, Any]],
+    inferred_schema: dict[str, Any],
+) -> str:
+    col = issue["column"]
+    row_idx = issue["row"]
+    value = issue.get("value", "")
+    schema_info = inferred_schema.get(col, {})
+
+    sample_values = list(set(str(r.get(col, "")) for r in records[:50] if r.get(col)))[:15]
+
+    context = (
+        f"Column: {col}\n"
+        f"Detected type: {schema_info.get('dtype', 'unknown')}\n"
+        f"Format pattern: {schema_info.get('format_pattern', 'none')}\n"
+        f"Current value: '{value}'\n"
+        f"Issue type: {issue.get('anomaly_type', 'unknown')}\n"
+        f"Issue details: {issue.get('details', '')}\n"
+        f"Sample values from this column: {sample_values}\n"
+        f"Row index: {row_idx}\n"
+    )
+
+    if row_idx < len(records):
+        row_data = {k: v for k, v in records[row_idx].items() if k != col}
+        context += f"Other columns in this row: {row_data}\n"
+
+    return context
+
+
 def _try_rules_engine(
     issue: dict[str, Any],
     records: list[dict[str, Any]],
@@ -127,26 +157,7 @@ def _llm_repair(
     """Fall back to LLM for complex repairs."""
     col = issue["column"]
     row_idx = issue["row"]
-    value = issue.get("value", "")
-    schema_info = inferred_schema.get(col, {})
-
-    sample_values = list(set(str(r.get(col, "")) for r in records[:50] if r.get(col)))[:15]
-
-    context = (
-        f"Column: {col}\n"
-        f"Detected type: {schema_info.get('dtype', 'unknown')}\n"
-        f"Format pattern: {schema_info.get('format_pattern', 'none')}\n"
-        f"Current value: '{value}'\n"
-        f"Issue type: {issue.get('anomaly_type', 'unknown')}\n"
-        f"Issue details: {issue.get('details', '')}\n"
-        f"Sample values from this column: {sample_values}\n"
-        f"Row index: {row_idx}\n"
-    )
-
-    # Include neighboring columns for context
-    if row_idx < len(records):
-        row_data = {k: v for k, v in records[row_idx].items() if k != col}
-        context += f"Other columns in this row: {row_data}\n"
+    context = _build_llm_context(issue, records, inferred_schema)
 
     try:
         llm = _get_llm()
@@ -161,6 +172,15 @@ def _llm_repair(
             rule_name=f"llm:{settings.primary_model}",
             confidence=response.confidence,
             reasoning=response.reasoning,
+            metadata={
+                "llm_log": {
+                    "row": row_idx,
+                    "column": col,
+                    "model": settings.primary_model,
+                    "prompt": context,
+                    "structured_output": response.model_dump(),
+                }
+            },
         )
     except Exception as e:
         logger.error("LLM repair failed for row %d, col %s: %s", row_idx, col, e)
@@ -179,6 +199,7 @@ def cleaner_node(state: DataCleaningState) -> dict[str, Any]:
     anomalies = state.get("anomalies", [])
     inferred_schema = state.get("inferred_schema", {})
     existing_actions = state.get("cleaning_actions", [])
+    existing_llm_logs = state.get("llm_logs", [])
 
     # Also fix validation errors from previous iteration
     validation_errors = state.get("validation_errors", [])
@@ -187,11 +208,13 @@ def cleaner_node(state: DataCleaningState) -> dict[str, Any]:
         return {
             "cleaning_actions": existing_actions,
             "cleaned_records": records,
+            "llm_logs": existing_llm_logs,
             "iteration_count": iteration + 1,
         }
 
     cleaned = copy.deepcopy(records)
     actions: list[dict[str, Any]] = list(existing_actions)
+    llm_logs: list[dict[str, Any]] = list(existing_llm_logs)
 
     # Build null-cell issues from records
     null_issues: list[dict[str, Any]] = []
@@ -252,7 +275,19 @@ def cleaner_node(state: DataCleaningState) -> dict[str, Any]:
                 "confidence": action.confidence,
                 "reasoning": action.reasoning,
                 "issue_type": issue.get("anomaly_type", "unknown"),
+                "metadata": action.metadata,
             })
+
+            llm_log = action.metadata.get("llm_log")
+            if llm_log:
+                llm_logs.append({
+                    **llm_log,
+                    "old_value": old_value,
+                    "new_value": action.new_value,
+                    "confidence": action.confidence,
+                    "reasoning": action.reasoning,
+                    "issue_type": issue.get("anomaly_type", "unknown"),
+                })
 
             # Auto-learn: store LLM fixes as patterns for future reuse
             if action.rule_name.startswith("llm:") and action.confidence >= 0.7:
@@ -282,6 +317,7 @@ def cleaner_node(state: DataCleaningState) -> dict[str, Any]:
     return {
         "cleaning_actions": actions,
         "cleaned_records": cleaned,
+        "llm_logs": llm_logs,
         "iteration_count": iteration + 1,
     }
 

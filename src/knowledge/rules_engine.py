@@ -7,7 +7,7 @@ Rules are tried in priority order; first match wins.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -21,6 +21,7 @@ class CleaningAction:
     rule_name: str
     confidence: float
     reasoning: str
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------

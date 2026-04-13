@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import logging
 from typing import Any
 
@@ -25,6 +26,24 @@ def _categorize_fix(fix: dict[str, Any]) -> str:
     return "unknown"
 
 
+def _build_review_queue(low_confidence: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    queue: list[dict[str, Any]] = []
+    for index, fix in enumerate(low_confidence):
+        queue.append({
+            "id": f"review-{index}",
+            "status": "pending",
+            "row": fix.get("row", -1),
+            "column": fix.get("column", ""),
+            "old_value": fix.get("old_value"),
+            "suggested_value": fix.get("new_value"),
+            "confidence": fix.get("confidence", 0.0),
+            "reasoning": fix.get("reasoning", ""),
+            "issue_type": fix.get("issue_type", "unknown"),
+            "fix_method": fix.get("rule", "unknown"),
+        })
+    return queue
+
+
 @traceable(name="confidence_scorer", metadata={"agent": "confidence_scorer"})
 def confidence_scorer_node(state: DataCleaningState) -> dict[str, Any]:
     """LangGraph node: score confidence and route low-confidence fixes."""
@@ -34,6 +53,7 @@ def confidence_scorer_node(state: DataCleaningState) -> dict[str, Any]:
     if not cleaning_actions:
         return {
             "low_confidence_fixes": [],
+            "review_queue": [],
             "audit_log": [],
             "final_report": _build_report(state, [], [], 0.0),
         }
@@ -48,6 +68,7 @@ def confidence_scorer_node(state: DataCleaningState) -> dict[str, Any]:
         confidence_sum += confidence
 
         audit_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "row_index": fix.get("row", -1),
             "column_name": fix.get("column", ""),
             "original_value": fix.get("old_value"),
@@ -58,6 +79,7 @@ def confidence_scorer_node(state: DataCleaningState) -> dict[str, Any]:
             "reasoning": fix.get("reasoning", ""),
             "agent_name": "cleaner",
             "tier": tier,
+            "trace_id": "",
         }
         audit_entries.append(audit_entry)
 
@@ -88,6 +110,7 @@ def confidence_scorer_node(state: DataCleaningState) -> dict[str, Any]:
 
     return {
         "low_confidence_fixes": low_confidence,
+        "review_queue": _build_review_queue(low_confidence),
         "audit_log": audit_entries,
         "final_report": report,
     }

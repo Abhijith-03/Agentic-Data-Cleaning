@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     pattern_confidence: float = 0.85
     max_cleaning_iterations: int = Field(default=3, alias="MAX_CLEANING_ITERATIONS")
 
+    # --- Structure reconstruction ---
+    reconstruction_schema_llm_enabled: bool = Field(
+        default=True,
+        alias="RECONSTRUCTION_SCHEMA_LLM",
+    )
+
     # --- Data processing ---
     chunk_size: int = Field(default=50_000, alias="CHUNK_SIZE")
     polars_threshold: int = Field(

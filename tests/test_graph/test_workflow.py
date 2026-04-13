@@ -35,8 +35,16 @@ class TestGraphBuild:
         graph = build_graph()
         node_names = set(graph.nodes.keys())
         expected = {
-            "ingest", "schema_analysis", "data_profiling",
-            "anomaly_detection", "cleaning", "validation",
-            "confidence_scoring", "human_review", "output",
+            "ingest",
+            "reconstruction_schema_planner",
+            "structure_reconstruction",
+            "schema_analysis",
+            "data_profiling",
+            "anomaly_detection",
+            "cleaning",
+            "validation",
+            "confidence_scoring",
+            "human_review",
+            "output",
         }
         assert expected.issubset(node_names)

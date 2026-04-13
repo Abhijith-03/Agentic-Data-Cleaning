@@ -11,6 +11,15 @@ class DataCleaningState(TypedDict, total=False):
     dataset_id: str
     raw_records: list[dict[str, Any]]
 
+    # --- Structure reconstruction ---
+    reconstruction_spec: dict[str, Any]
+    reconstruction_report: dict[str, Any]
+    reconstruction_row_confidences: list[float]
+
+    # --- Pipeline execution telemetry ---
+    pipeline_stages: dict[str, dict[str, Any]]
+    stage_previews: dict[str, dict[str, Any]]
+
     # --- Schema analysis ---
     inferred_schema: dict[str, dict[str, Any]]
     schema_issues: list[dict[str, Any]]
@@ -32,6 +41,8 @@ class DataCleaningState(TypedDict, total=False):
 
     # --- Confidence & routing ---
     low_confidence_fixes: list[dict[str, Any]]
+    llm_logs: list[dict[str, Any]]
+    review_queue: list[dict[str, Any]]
     iteration_count: int
 
     # --- Audit ---
